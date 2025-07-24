@@ -1,0 +1,85 @@
+NAME := noods
+BUILD := build-arm64
+SRCS := src src/common src/desktop
+# Use more conservative flags for ARM64 embedded systems
+# Detect architecture and set appropriate flags
+ARCH := $(shell uname -m)
+
+# Check if we're cross-compiling for ARM64
+ifneq ($(findstring aarch64,$(CXX)),)
+    # Cross-compiling for ARM64
+    ARGS := -O2 -std=c++11 -DUSE_GL_CANVAS -DLOG_LEVEL=0 -march=armv8-a -mtune=cortex-a53
+else ifeq ($(ARCH),aarch64)
+    # Native ARM64
+    ARGS := -O2 -std=c++11 -DUSE_GL_CANVAS -DLOG_LEVEL=0 -march=armv8-a -mtune=cortex-a53
+else ifeq ($(ARCH),arm64)
+    # Native ARM64 (alternative name)
+    ARGS := -O2 -std=c++11 -DUSE_GL_CANVAS -DLOG_LEVEL=0 -march=armv8-a -mtune=cortex-a53
+else
+    # Fallback for other architectures
+    ARGS := -O2 -std=c++11 -DUSE_GL_CANVAS -DLOG_LEVEL=0
+endif
+# Cross-compilation friendly pkg-config
+PKG_CONFIG ?= pkg-config
+LIBS := $(shell $(PKG_CONFIG) --libs portaudio-2.0)
+INCS := $(shell $(PKG_CONFIG) --cflags portaudio-2.0)
+
+APPNAME := NooDS
+PKGNAME := com.hydra.noods
+DESTDIR ?= /usr
+
+# ARM64 Linux specific settings
+# Cross-compilation friendly wx-config
+WX_CONFIG ?= wx-config
+LIBS += $(shell $(WX_CONFIG) --libs --gl-libs)
+INCS += $(shell $(WX_CONFIG) --cxxflags)
+LIBS += -lGL
+
+# Add ARM64-specific optimizations if supported
+ARGS += -ffunction-sections -fdata-sections
+LDFLAGS := -Wl,--gc-sections
+
+CPPFILES := $(foreach dir,$(SRCS),$(wildcard $(dir)/*.cpp))
+HFILES := $(foreach dir,$(SRCS),$(wildcard $(dir)/*.h))
+OFILES := $(patsubst %.cpp,$(BUILD)/%.o,$(CPPFILES))
+
+all: $(NAME)
+
+# Debug target to show build variables
+debug:
+	@echo "ARCH: $(ARCH)"
+	@echo "CXX: $(CXX)"
+	@echo "CC: $(CC)"
+	@echo "PKG_CONFIG: $(PKG_CONFIG)"
+	@echo "WX_CONFIG: $(WX_CONFIG)"
+	@echo "ARGS: $(ARGS)"
+	@echo "Cross-compilation check: $(findstring aarch64,$(CXX))"
+
+install: $(NAME)
+	install -Dm755 $(NAME) "$(DESTDIR)/bin/$(NAME)"
+	install -Dm644 $(PKGNAME).desktop "$(DESTDIR)/share/applications/$(PKGNAME).desktop"
+	install -Dm644 icon/icon-linux.png "$(DESTDIR)/share/icons/hicolor/64x64/apps/$(PKGNAME).png"
+
+uninstall: 
+	rm -f "$(DESTDIR)/bin/$(NAME)"
+	rm -f "$(DESTDIR)/share/applications/$(PKGNAME).desktop"
+	rm -f "$(DESTDIR)/share/icons/hicolor/64x64/apps/$(PKGNAME).png"
+
+# Use cross-compilation variables if set, otherwise default to g++
+CXX ?= g++
+CC ?= gcc
+
+$(NAME): $(OFILES)
+	$(CXX) -o $@ $(ARGS) $(LDFLAGS) $^ $(LIBS)
+
+$(BUILD)/%.o: %.cpp $(HFILES) $(BUILD)
+	$(CXX) -c -o $@ $(ARGS) $(INCS) $<
+
+$(BUILD):
+	for dir in $(SRCS); do mkdir -p $(BUILD)/$$dir; done
+
+clean:
+	rm -rf $(BUILD)
+	rm -f $(NAME)
+
+.PHONY: all debug install uninstall clean 

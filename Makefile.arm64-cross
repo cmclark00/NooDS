@@ -1,0 +1,71 @@
+NAME := noods
+BUILD := build-arm64-cross
+SRCS := src src/common
+# Remove desktop GUI sources for cross-compilation
+# SRCS := src src/common src/desktop
+
+# Cross-compilation settings
+CXX ?= aarch64-buildroot-linux-gnu-g++
+CC ?= aarch64-buildroot-linux-gnu-gcc
+
+# Conservative ARM64 flags for cross-compilation
+ARGS := -O2 -std=c++11 -DLOG_LEVEL=0 -march=armv8-a -mtune=cortex-a53 -ffunction-sections -fdata-sections
+
+# Minimal libraries for console/headless build
+LIBS := -lm -lpthread
+
+# Include paths for headers
+INCS := -Isrc -Isrc/common
+
+# No GUI dependencies for cross-compilation
+# LIBS := $(shell pkg-config --libs portaudio-2.0)
+# INCS += $(shell pkg-config --cflags portaudio-2.0)
+# LIBS += $(shell wx-config --libs --gl-libs)
+# INCS += $(shell wx-config --cxxflags)
+
+APPNAME := NooDS
+PKGNAME := com.hydra.noods
+DESTDIR ?= /usr
+
+# Add link-time optimizations
+LDFLAGS := -Wl,--gc-sections
+
+CPPFILES := $(foreach dir,$(SRCS),$(wildcard $(dir)/*.cpp))
+HFILES := $(foreach dir,$(SRCS),$(wildcard $(dir)/*.h))
+OFILES := $(patsubst %.cpp,$(BUILD)/%.o,$(CPPFILES)) $(BUILD)/minimal_main.o
+
+all: $(NAME)
+
+# Debug target to show build variables
+debug:
+	@echo "ARCH: $(shell uname -m)"
+	@echo "CXX: $(CXX)"
+	@echo "CC: $(CC)"
+	@echo "ARGS: $(ARGS)"
+	@echo "LIBS: $(LIBS)"
+	@echo "SRCS: $(SRCS)"
+	@echo "CPPFILES: $(CPPFILES)"
+
+install: $(NAME)
+	install -Dm755 $(NAME) "$(DESTDIR)/bin/$(NAME)"
+
+uninstall: 
+	rm -f "$(DESTDIR)/bin/$(NAME)"
+
+$(NAME): $(OFILES)
+	$(CXX) -o $@ $(ARGS) $(LDFLAGS) $^ $(LIBS)
+
+$(BUILD)/%.o: %.cpp $(HFILES) $(BUILD)
+	$(CXX) -c -o $@ $(ARGS) $(INCS) $<
+
+$(BUILD)/minimal_main.o: minimal_main.cpp $(HFILES) $(BUILD)
+	$(CXX) -c -o $@ $(ARGS) $(INCS) $<
+
+$(BUILD):
+	for dir in $(SRCS); do mkdir -p $(BUILD)/$$dir; done
+
+clean:
+	rm -rf $(BUILD)
+	rm -f $(NAME)
+
+.PHONY: all debug install uninstall clean 

@@ -100,10 +100,14 @@ wiiu:
 vita:
 	$(MAKE) -f Makefile.vita
 
+arm64:
+	$(MAKE) -f Makefile.arm64
+
 clean:
 	if [ -d "build-android" ]; then ./gradlew clean; fi
 	if [ -d "build-switch" ]; then $(MAKE) -f Makefile.switch clean; fi
 	if [ -d "build-wiiu" ]; then $(MAKE) -f Makefile.wiiu clean; fi
 	if [ -d "build-vita" ]; then $(MAKE) -f Makefile.vita clean; fi
+	if [ -d "build-arm64" ]; then $(MAKE) -f Makefile.arm64 clean; fi
 	rm -rf $(BUILD)
 	rm -f $(NAME)
